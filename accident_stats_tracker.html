@@ -1,0 +1,443 @@
+
+<h2 class="sr-only">ระบบเก็บสถิติอุบัติเหตุ — บันทึก ดูข้อมูล และวิเคราะห์สถิติ</h2>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+
+.header { padding: 1.5rem 0 1rem; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 1.5rem; }
+.header h1 { font-size: 20px; font-weight: 500; color: var(--color-text-primary); display: flex; align-items: center; gap: 10px; }
+.header p { font-size: 13px; color: var(--color-text-secondary); margin-top: 4px; }
+
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+.metric { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 1rem; }
+.metric-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+.metric-value { font-size: 22px; font-weight: 500; color: var(--color-text-primary); }
+.metric-value.danger { color: #A32D2D; }
+.metric-value.warning { color: #854F0B; }
+.metric-value.info { color: #185FA5; }
+
+.section { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
+.section-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-group label { font-size: 12px; color: var(--color-text-secondary); font-weight: 500; }
+.form-group input, .form-group select, .form-group textarea {
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  width: 100%;
+}
+.form-group textarea { resize: vertical; min-height: 60px; }
+
+.btn-row { display: flex; gap: 8px; margin-top: 12px; }
+.btn-primary {
+  background: var(--color-text-primary);
+  color: var(--color-background-primary);
+  border: none;
+  border-radius: var(--border-radius-md);
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 8px 18px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-secondary:hover { background: var(--color-background-secondary); }
+
+.tab-row { display: flex; gap: 4px; margin-bottom: 1rem; }
+.tab { padding: 6px 14px; font-size: 13px; border-radius: var(--border-radius-md); cursor: pointer; border: 0.5px solid transparent; color: var(--color-text-secondary); background: transparent; font-family: var(--font-sans); }
+.tab.active { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); font-weight: 500; }
+
+.record-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.record-table th { text-align: left; padding: 6px 10px; font-size: 11px; font-weight: 500; color: var(--color-text-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
+.record-table td { padding: 8px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); color: var(--color-text-primary); vertical-align: top; }
+.record-table tr:last-child td { border-bottom: none; }
+.record-table tr:hover td { background: var(--color-background-secondary); }
+
+.badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+.badge-red { background: #FCEBEB; color: #791F1F; }
+.badge-amber { background: #FAEEDA; color: #633806; }
+.badge-blue { background: #E6F1FB; color: #0C447C; }
+.badge-gray { background: #F1EFE8; color: #444441; }
+
+.chart-wrap { position: relative; width: 100%; height: 220px; margin-top: 8px; }
+
+.empty-state { text-align: center; padding: 2rem; color: var(--color-text-secondary); font-size: 13px; }
+
+.toast { position: fixed; bottom: 20px; right: 20px; background: var(--color-text-primary); color: var(--color-background-primary); padding: 10px 16px; border-radius: var(--border-radius-md); font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 100; }
+.toast.show { opacity: 1; }
+
+.filter-row { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+.filter-row input, .filter-row select { padding: 6px 10px; font-size: 13px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-secondary); color: var(--color-text-primary); font-family: var(--font-sans); }
+</style>
+
+<div class="header">
+  <h1><i class="ti ti-shield-exclamation" aria-hidden="true"></i> ระบบเก็บสถิติอุบัติเหตุ</h1>
+  <p>บันทึก ติดตาม และวิเคราะห์ข้อมูลอุบัติเหตุ</p>
+</div>
+
+<div class="metrics">
+  <div class="metric">
+    <div class="metric-label"><i class="ti ti-clipboard-list" aria-hidden="true"></i> ทั้งหมด</div>
+    <div class="metric-value" id="m-total">0</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label"><i class="ti ti-alert-triangle" aria-hidden="true"></i> รุนแรง</div>
+    <div class="metric-value danger" id="m-severe">0</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label"><i class="ti ti-calendar-month" aria-hidden="true"></i> เดือนนี้</div>
+    <div class="metric-value info" id="m-month">0</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label"><i class="ti ti-user-exclamation" aria-hidden="true"></i> ผู้บาดเจ็บรวม</div>
+    <div class="metric-value warning" id="m-injured">0</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="tab-row">
+    <button class="tab active" onclick="switchTab('form', this)"><i class="ti ti-plus" aria-hidden="true"></i> บันทึกใหม่</button>
+    <button class="tab" onclick="switchTab('records', this)"><i class="ti ti-table" aria-hidden="true"></i> รายการ</button>
+    <button class="tab" onclick="switchTab('chart', this)"><i class="ti ti-chart-bar" aria-hidden="true"></i> สถิติ</button>
+  </div>
+
+  <div id="tab-form">
+    <div class="section-title"><i class="ti ti-pencil" aria-hidden="true"></i> กรอกข้อมูลอุบัติเหตุ</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>วันที่เกิดเหตุ</label>
+        <input type="date" id="f-date">
+      </div>
+      <div class="form-group">
+        <label>เวลา</label>
+        <input type="time" id="f-time">
+      </div>
+      <div class="form-group">
+        <label>สถานที่</label>
+        <input type="text" id="f-location" placeholder="เช่น ถนนสุขุมวิท กม.10">
+      </div>
+      <div class="form-group">
+        <label>ประเภทอุบัติเหตุ</label>
+        <select id="f-type">
+          <option value="">-- เลือก --</option>
+          <option value="รถชนรถ">รถชนรถ</option>
+          <option value="รถชนคนเดินเท้า">รถชนคนเดินเท้า</option>
+          <option value="รถพลิกคว่ำ">รถพลิกคว่ำ</option>
+          <option value="รถชนสิ่งกีดขวาง">รถชนสิ่งกีดขวาง</option>
+          <option value="จักรยานยนต์">จักรยานยนต์</option>
+          <option value="อื่นๆ">อื่นๆ</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>ระดับความรุนแรง</label>
+        <select id="f-severity">
+          <option value="เล็กน้อย">เล็กน้อย</option>
+          <option value="ปานกลาง">ปานกลาง</option>
+          <option value="รุนแรง">รุนแรง</option>
+          <option value="เสียชีวิต">เสียชีวิต</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>จำนวนผู้บาดเจ็บ</label>
+        <input type="number" id="f-injured" min="0" value="0">
+      </div>
+      <div class="form-group">
+        <label>จำนวนผู้เสียชีวิต</label>
+        <input type="number" id="f-dead" min="0" value="0">
+      </div>
+      <div class="form-group">
+        <label>ยานพาหนะที่เกี่ยวข้อง</label>
+        <input type="text" id="f-vehicle" placeholder="เช่น รถยนต์ 2 คัน">
+      </div>
+      <div class="form-group full">
+        <label>รายละเอียดเพิ่มเติม</label>
+        <textarea id="f-note" placeholder="บันทึกรายละเอียดเพิ่มเติม..."></textarea>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="saveRecord()"><i class="ti ti-device-floppy" aria-hidden="true"></i> บันทึกข้อมูล</button>
+      <button class="btn-secondary" onclick="clearForm()">ล้างข้อมูล</button>
+    </div>
+  </div>
+
+  <div id="tab-records" style="display:none">
+    <div class="filter-row">
+      <input type="text" id="search" placeholder="ค้นหาสถานที่..." oninput="renderTable()" style="flex:1; min-width:120px;">
+      <select id="filter-severity" onchange="renderTable()">
+        <option value="">ทุกระดับ</option>
+        <option value="เล็กน้อย">เล็กน้อย</option>
+        <option value="ปานกลาง">ปานกลาง</option>
+        <option value="รุนแรง">รุนแรง</option>
+        <option value="เสียชีวิต">เสียชีวิต</option>
+      </select>
+      <select id="filter-type" onchange="renderTable()">
+        <option value="">ทุกประเภท</option>
+        <option value="รถชนรถ">รถชนรถ</option>
+        <option value="รถชนคนเดินเท้า">รถชนคนเดินเท้า</option>
+        <option value="รถพลิกคว่ำ">รถพลิกคว่ำ</option>
+        <option value="รถชนสิ่งกีดขวาง">รถชนสิ่งกีดขวาง</option>
+        <option value="จักรยานยนต์">จักรยานยนต์</option>
+        <option value="อื่นๆ">อื่นๆ</option>
+      </select>
+    </div>
+    <div id="table-container"></div>
+  </div>
+
+  <div id="tab-chart" style="display:none">
+    <div class="section-title"><i class="ti ti-chart-bar" aria-hidden="true"></i> สถิติภาพรวม</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <div>
+        <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:6px;">ประเภทอุบัติเหตุ</div>
+        <div class="chart-wrap"><canvas id="chartType" role="img" aria-label="แผนภูมิแสดงประเภทอุบัติเหตุ">สถิติประเภทอุบัติเหตุ</canvas></div>
+      </div>
+      <div>
+        <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:6px;">ระดับความรุนแรง</div>
+        <div class="chart-wrap"><canvas id="chartSev" role="img" aria-label="แผนภูมิแสดงระดับความรุนแรง">สถิติระดับความรุนแรง</canvas></div>
+      </div>
+    </div>
+    <div style="margin-top:1rem;">
+      <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:6px;">อุบัติเหตุรายเดือน (12 เดือนล่าสุด)</div>
+      <div class="chart-wrap" style="height:160px;"><canvas id="chartMonthly" role="img" aria-label="แผนภูมิอุบัติเหตุรายเดือน">สถิติรายเดือน</canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let records = [];
+let charts = {};
+const SEV_COLOR = { 'เล็กน้อย': '#378ADD', 'ปานกลาง': '#BA7517', 'รุนแรง': '#D85A30', 'เสียชีวิต': '#A32D2D' };
+
+function today() {
+  return new Date().toISOString().slice(0,10);
+}
+function nowTime() {
+  return new Date().toTimeString().slice(0,5);
+}
+
+document.getElementById('f-date').value = today();
+document.getElementById('f-time').value = nowTime();
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function saveRecord() {
+  const date = document.getElementById('f-date').value;
+  const time = document.getElementById('f-time').value;
+  const location = document.getElementById('f-location').value.trim();
+  const type = document.getElementById('f-type').value;
+  const severity = document.getElementById('f-severity').value;
+  const injured = parseInt(document.getElementById('f-injured').value) || 0;
+  const dead = parseInt(document.getElementById('f-dead').value) || 0;
+  const vehicle = document.getElementById('f-vehicle').value.trim();
+  const note = document.getElementById('f-note').value.trim();
+
+  if (!date || !location || !type) { showToast('กรุณากรอกวันที่ สถานที่ และประเภท'); return; }
+
+  records.push({ id: Date.now(), date, time, location, type, severity, injured, dead, vehicle, note });
+  updateMetrics();
+  renderTable();
+  if (Object.keys(charts).length) updateCharts();
+  showToast('บันทึกข้อมูลเรียบร้อย');
+  clearForm();
+}
+
+function clearForm() {
+  document.getElementById('f-location').value = '';
+  document.getElementById('f-type').value = '';
+  document.getElementById('f-severity').value = 'เล็กน้อย';
+  document.getElementById('f-injured').value = '0';
+  document.getElementById('f-dead').value = '0';
+  document.getElementById('f-vehicle').value = '';
+  document.getElementById('f-note').value = '';
+  document.getElementById('f-date').value = today();
+  document.getElementById('f-time').value = nowTime();
+}
+
+function deleteRecord(id) {
+  records = records.filter(r => r.id !== id);
+  updateMetrics();
+  renderTable();
+  if (Object.keys(charts).length) updateCharts();
+  showToast('ลบข้อมูลแล้ว');
+}
+
+function updateMetrics() {
+  const now = new Date();
+  const thisMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('m-total').textContent = records.length;
+  document.getElementById('m-severe').textContent = records.filter(r => r.severity === 'รุนแรง' || r.severity === 'เสียชีวิต').length;
+  document.getElementById('m-month').textContent = records.filter(r => r.date && r.date.startsWith(thisMonth)).length;
+  document.getElementById('m-injured').textContent = records.reduce((a,r) => a + r.injured + r.dead, 0);
+}
+
+function sevBadge(s) {
+  const cls = { 'เล็กน้อย':'badge-blue','ปานกลาง':'badge-amber','รุนแรง':'badge-red','เสียชีวิต':'badge-gray' };
+  return `<span class="badge ${cls[s]||'badge-gray'}">${s}</span>`;
+}
+
+function renderTable() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const fs = document.getElementById('filter-severity').value;
+  const ft = document.getElementById('filter-type').value;
+  let filtered = records.filter(r =>
+    (!q || r.location.toLowerCase().includes(q) || r.type.toLowerCase().includes(q)) &&
+    (!fs || r.severity === fs) &&
+    (!ft || r.type === ft)
+  ).slice().reverse();
+
+  const c = document.getElementById('table-container');
+  if (filtered.length === 0) {
+    c.innerHTML = '<div class="empty-state"><i class="ti ti-database-off" style="font-size:24px;display:block;margin-bottom:6px;" aria-hidden="true"></i>ยังไม่มีข้อมูล</div>';
+    return;
+  }
+  c.innerHTML = `<table class="record-table">
+    <thead><tr>
+      <th>วันที่/เวลา</th><th>สถานที่</th><th>ประเภท</th><th>ความรุนแรง</th><th>บาดเจ็บ</th><th>เสียชีวิต</th><th></th>
+    </tr></thead>
+    <tbody>${filtered.map(r => `<tr>
+      <td style="white-space:nowrap">${r.date}<br><span style="font-size:11px;color:var(--color-text-secondary)">${r.time}</span></td>
+      <td>${r.location}</td>
+      <td>${r.type}</td>
+      <td>${sevBadge(r.severity)}</td>
+      <td>${r.injured}</td>
+      <td>${r.dead}</td>
+      <td><button onclick="deleteRecord(${r.id})" style="background:none;border:none;cursor:pointer;color:var(--color-text-secondary);font-size:16px;padding:2px 4px;" title="ลบ"><i class="ti ti-trash" aria-hidden="true"></i></button></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function getTypeCounts() {
+  const counts = {};
+  records.forEach(r => { counts[r.type] = (counts[r.type]||0)+1; });
+  return counts;
+}
+
+function getSevCounts() {
+  const order = ['เล็กน้อย','ปานกลาง','รุนแรง','เสียชีวิต'];
+  const counts = {};
+  order.forEach(k => counts[k] = 0);
+  records.forEach(r => { if (counts[r.severity] !== undefined) counts[r.severity]++; });
+  return counts;
+}
+
+function getMonthly() {
+  const months = [];
+  const now = new Date();
+  for (let i=11; i>=0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    const label = String(d.getMonth()+1) + '/' + String(d.getFullYear()).slice(2);
+    months.push({ key, label });
+  }
+  return months.map(m => ({
+    label: m.label,
+    count: records.filter(r => r.date && r.date.startsWith(m.key)).length
+  }));
+}
+
+function updateCharts() {
+  const tc = getTypeCounts();
+  const sc = getSevCounts();
+  const mc = getMonthly();
+
+  if (charts.type) {
+    charts.type.data.labels = Object.keys(tc);
+    charts.type.data.datasets[0].data = Object.values(tc);
+    charts.type.data.datasets[0].backgroundColor = Object.keys(tc).map((_,i) => ['#378ADD','#BA7517','#1D9E75','#D85A30','#7F77DD','#73726c'][i%6]);
+    charts.type.update();
+  }
+  if (charts.sev) {
+    charts.sev.data.datasets[0].data = Object.values(sc);
+    charts.sev.update();
+  }
+  if (charts.monthly) {
+    charts.monthly.data.labels = mc.map(m=>m.label);
+    charts.monthly.data.datasets[0].data = mc.map(m=>m.count);
+    charts.monthly.update();
+  }
+}
+
+function initCharts() {
+  const tc = getTypeCounts();
+  const sc = getSevCounts();
+  const mc = getMonthly();
+
+  charts.type = new Chart(document.getElementById('chartType'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(tc).length ? Object.keys(tc) : ['ยังไม่มีข้อมูล'],
+      datasets: [{ data: Object.values(tc).length ? Object.values(tc) : [1], backgroundColor: Object.keys(tc).length ? Object.keys(tc).map((_,i) => ['#378ADD','#BA7517','#1D9E75','#D85A30','#7F77DD','#888780'][i%6]) : ['#D3D1C7'], borderWidth: 0 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, padding:8, boxWidth:10, boxHeight:10 } } } }
+  });
+
+  charts.sev = new Chart(document.getElementById('chartSev'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(sc),
+      datasets: [{ data: Object.values(sc), backgroundColor: Object.keys(sc).map(k => SEV_COLOR[k]||'#888'), borderWidth: 0, borderRadius: 4 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ grid:{display:false}, ticks:{font:{size:11}} }, y:{ beginAtZero:true, ticks:{stepSize:1, font:{size:11}}, grid:{color:'rgba(0,0,0,0.05)'} } } }
+  });
+
+  charts.monthly = new Chart(document.getElementById('chartMonthly'), {
+    type: 'line',
+    data: {
+      labels: mc.map(m=>m.label),
+      datasets: [{ data: mc.map(m=>m.count), borderColor:'#378ADD', backgroundColor:'rgba(55,138,221,0.08)', fill:true, tension:0.4, pointRadius:3, borderWidth:2 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ grid:{display:false}, ticks:{font:{size:10}} }, y:{ beginAtZero:true, ticks:{stepSize:1, font:{size:10}}, grid:{color:'rgba(0,0,0,0.05)'} } } }
+  });
+}
+
+function switchTab(name, btn) {
+  ['form','records','chart'].forEach(t => document.getElementById('tab-'+t).style.display = 'none');
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+name).style.display = '';
+  btn.classList.add('active');
+  if (name === 'records') renderTable();
+  if (name === 'chart') {
+    if (!Object.keys(charts).length) initCharts();
+    else updateCharts();
+  }
+}
+
+loadSampleData();
+
+function loadSampleData() {
+  const samples = [
+    { date:'2026-05-01', time:'08:15', location:'ถนนสุขุมวิท กม.5', type:'รถชนรถ', severity:'ปานกลาง', injured:2, dead:0, vehicle:'รถยนต์ 2 คัน', note:'' },
+    { date:'2026-05-08', time:'17:30', location:'แยกอโศก', type:'รถชนคนเดินเท้า', severity:'รุนแรง', injured:1, dead:0, vehicle:'รถยนต์ 1 คัน', note:'' },
+    { date:'2026-05-12', time:'23:00', location:'ถนนพหลโยธิน', type:'จักรยานยนต์', severity:'เล็กน้อย', injured:1, dead:0, vehicle:'จักรยานยนต์ 1 คัน', note:'' },
+    { date:'2026-04-20', time:'14:00', location:'ถนนลาดพร้าว', type:'รถพลิกคว่ำ', severity:'เสียชีวิต', injured:2, dead:1, vehicle:'รถกระบะ', note:'' },
+    { date:'2026-04-05', time:'09:00', location:'ถนนรัชดาภิเษก', type:'รถชนรถ', severity:'เล็กน้อย', injured:0, dead:0, vehicle:'รถยนต์ 2 คัน', note:'' },
+  ];
+  samples.forEach(s => records.push({ id: Date.now() + Math.random(), ...s }));
+  updateMetrics();
+}
+</script>
